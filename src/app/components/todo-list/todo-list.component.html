@@ -1,0 +1,167 @@
+<section class="todo-app" aria-label="Todo list application">
+  <!-- ===== Add form ===== -->
+  <form [formGroup]="todoForm" (ngSubmit)="submit()" class="add-form">
+    <div class="add-row">
+      <input
+        formControlName="title"
+        type="text"
+        class="todo-input"
+        placeholder="What needs to be done?"
+        maxlength="200"
+        aria-label="New todo title"
+        autocomplete="off"
+      />
+      <button type="submit" class="btn btn-primary" [disabled]="todoForm.invalid">Add</button>
+    </div>
+
+    <div *ngIf="formTitle?.invalid && formTitle?.touched" class="error" role="alert">
+      <span *ngIf="formTitle?.errors?.required">Title is required.</span>
+      <span *ngIf="formTitle?.errors?.maxlength">Title must be at most 200 characters.</span>
+    </div>
+
+    <div class="meta-row">
+      <label class="meta-field">
+        <span>Due date</span>
+        <input type="date" formControlName="dueDate" aria-label="Due date" />
+      </label>
+      <label class="meta-field">
+        <span>Priority</span>
+        <select formControlName="priority" aria-label="Priority">
+          <option *ngFor="let p of priorities" [value]="p">{{ p | titlecase }}</option>
+        </select>
+      </label>
+    </div>
+  </form>
+
+  <!-- ===== Search + filters ===== -->
+  <div class="toolbar">
+    <input
+      type="search"
+      class="search-input"
+      placeholder="Search todos…"
+      aria-label="Search todos"
+      [value]="search"
+      (input)="onSearch($any($event.target).value)"
+    />
+    <div class="filters" role="group" aria-label="Filter todos">
+      <button
+        *ngFor="let f of filters"
+        type="button"
+        class="btn btn-filter"
+        [class.active]="filter === f"
+        [attr.aria-pressed]="filter === f"
+        (click)="setFilter(f)"
+      >
+        {{ f | titlecase }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== List ===== -->
+  <ul
+    class="todo-list"
+    cdkDropList
+    (cdkDropListDropped)="onDrop($event)"
+    aria-label="Todos"
+  >
+    <li
+      *ngFor="let todo of visibleTodos; trackBy: trackById"
+      cdkDrag
+      class="todo"
+      [class.done]="todo.completed"
+      [class.overdue]="isOverdue(todo)"
+      [attr.data-priority]="todo.priority"
+    >
+      <span class="drag-handle" cdkDragHandle aria-hidden="true">⠿</span>
+
+      <input
+        type="checkbox"
+        class="check"
+        [checked]="todo.completed"
+        (change)="toggle(todo.id)"
+        [attr.aria-label]="(todo.completed ? 'Mark incomplete: ' : 'Mark complete: ') + todo.title"
+      />
+
+      <div class="body">
+        <ng-container *ngIf="editingId !== todo.id; else editTpl">
+          <span class="title" (dblclick)="startEdit(todo)">{{ todo.title }}</span>
+          <div class="badges">
+            <span *ngIf="todo.dueDate" class="badge badge-date" [class.badge-overdue]="isOverdue(todo)">
+              {{ todo.dueDate | date: 'mediumDate' }}
+            </span>
+            <span class="badge" [ngClass]="'badge-' + todo.priority">{{ todo.priority | titlecase }}</span>
+          </div>
+        </ng-container>
+        <ng-template #editTpl>
+          <input
+            type="text"
+            class="edit-input"
+            [value]="editTitle"
+            maxlength="200"
+            aria-label="Edit todo title"
+            (input)="onEditInput($any($event.target).value)"
+            (keydown)="onEditKeydown($event)"
+            autofocus
+          />
+        </ng-template>
+      </div>
+
+      <div class="actions">
+        <ng-container *ngIf="editingId !== todo.id; else editActions">
+          <button type="button" class="btn btn-icon" (click)="startEdit(todo)" aria-label="Edit todo">✏️</button>
+          <button type="button" class="btn btn-icon btn-danger" (click)="remove(todo)" aria-label="Delete todo">🗑️</button>
+        </ng-container>
+        <ng-template #editActions>
+          <button type="button" class="btn btn-sm btn-primary" (click)="saveEdit()">Save</button>
+          <button type="button" class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
+        </ng-template>
+      </div>
+
+      <div class="item-meta">
+        <label class="meta-inline">
+          <span>Due</span>
+          <input
+            type="date"
+            [value]="todo.dueDate || ''"
+            (change)="onDueDateChange(todo, $any($event.target).value)"
+            [attr.aria-label]="'Due date for ' + todo.title"
+          />
+        </label>
+        <label class="meta-inline">
+          <span>Priority</span>
+          <select
+            [value]="todo.priority"
+            (change)="onPriorityChange(todo, $any($event.target).value)"
+            [attr.aria-label]="'Priority for ' + todo.title"
+          >
+            <option *ngFor="let p of priorities" [value]="p">{{ p | titlecase }}</option>
+          </select>
+        </label>
+      </div>
+    </li>
+  </ul>
+
+  <p *ngIf="visibleTodos.length === 0" class="empty-state">
+    <ng-container *ngIf="todos.length === 0; else noneMatch">No todos yet — add one above! 🎉</ng-container>
+    <ng-template #noneMatch>No todos match the current filter/search.</ng-template>
+  </p>
+
+  <!-- ===== Footer / bulk actions ===== -->
+  <footer class="list-footer" *ngIf="todos.length > 0">
+    <span>{{ activeCount }} item{{ activeCount === 1 ? '' : 's' }} left</span>
+    <button
+      type="button"
+      class="btn btn-link"
+      (click)="clearCompleted()"
+      [disabled]="completedCount === 0"
+    >
+      Clear completed ({{ completedCount }})
+    </button>
+  </footer>
+
+  <!-- ===== Undo toast ===== -->
+  <div *ngIf="deleted" class="toast" role="status">
+    <span>Deleted “{{ deleted.todo.title }}”</span>
+    <button type="button" class="btn btn-sm btn-primary" (click)="undoDelete()">Undo</button>
+  </div>
+</section>
